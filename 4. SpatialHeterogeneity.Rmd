@@ -1,0 +1,141 @@
+---
+title: "Spatial heterogeneity"
+author: "Sariffuddin"
+date: "`r Sys.Date()`"
+output: rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(spdep)
+library(car)
+library(GWmodel)
+library(gridExtra)
+library(spgwr)
+library(spData)
+library(raster)
+library(lmtest)
+library(readxl)
+library(ggdist)
+library(cluster)
+library(clusterSim)
+library(tidyquant)
+library(ggthemes)
+library(FeatureImpCluster)
+library(flexclust)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(viridis)
+library(hrbrthemes)
+library(factoextra)
+```
+
+# Working Directory
+```{r}
+setwd("C:/Users/U728217/Desktop/2024Statistik") #sesuaikan dengan komputer masing-masing
+```
+
+```{r A. Data Distribution for All data}
+data <- read_excel("Semarang_fix.xlsx")
+data_gwr <- data %>% dplyr::select(
+                          kamar,
+                          rumah,
+                          harga,
+                          dis_SD,
+                          dis_SMP,
+                          dis_SMA)
+coor<-data[,(7:8)]
+coor<-as.matrix(coor)
+```
+
+# A. Spatial Statistics
+
+## A.1 Ordinary Least Square
+
+```{r A.1 Ordinary Least Square}
+reg1 = lm(harga~.,
+          data=data_gwr)
+
+summary(reg1)
+resid<-residuals(reg1)
+par(mfrow=c(2,2))
+#qqnorm(resid); qqline(resid, col="red"); 
+#plot(resid~fitted(reg1),xlab = "Predicted Values",ylab = "Residuals")
+#abline(h=0, col="red")
+#hist(resid) #histogram utk residual
+#plot(1:nrow(dtgwr), resid, pch=20,type="b")
+#abline(h=0, col="red")
+
+shapiro.test(resid)  #non normal
+lmtest::bptest(reg1) #hetero
+car::vif(reg1)
+```
+
+## A.2 Geographically Weighted Regression
+
+```{r Calculating weighted}
+# Formula
+form <- as.formula("harga ~
+                          kamar +
+                          rumah +
+                          harga +
+                          dis_SD +
+                          dis_SMP +
+                          dis_SMA")
+set.seed(123)
+```
+
+```{r convert into shapefiles}
+spdf <- st_as_sf(data, 
+                 coords = c("lng", 
+                            "lat"))
+spdf
+```
+
+```{r Computing weighted}
+# Calculating weighted
+xy <- st_coordinates(spdf)
+dm.calib <- gw.dist(xy)
+
+# SpatialPointsDataFrame
+spdf <- SpatialPointsDataFrame(xy, data)
+
+# Euclideance Distance
+dm.calib <- gw.dist(dp.locat = coordinates(spdf))
+```
+
+```{r Exponential  bandwidth}
+
+# Fixed
+mod3f_GWmodel <- bw.gwr(formula = form,
+                        data = spdf,
+                        approach = "cv",
+                        kernel = "exponential",
+                        adaptive = FALSE,
+                        dMat = dm.calib)
+```
+
+```{r Exponential model}
+
+H_mod3f_GWmodel <- gwr.basic(formula = form, 
+                       data = spdf, 
+                       bw = mod3f_GWmodel, 
+                       kernel="exponential", 
+                       adaptive=FALSE, 
+                       dMat=dm.calib)
+
+r2_3f <- as.numeric(H_mod3f_GWmodel$GW.diagnostic[6])
+
+r2_adj_3f <- as.numeric(H_mod3f_GWmodel$GW.diagnostic[7])
+
+H_mod3f_GWmodel 
+
+GWRresults<-as.data.frame(H_mod3f_GWmodel$SDF)
+write.csv(GWRresults,"GWRresults.csv", row.names = FALSE)
+```

@@ -1,0 +1,159 @@
+---
+title: "Web Scraping and Data Cleaning"
+author: "Sariffuddin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Working Directory
+```{r}
+setwd("C:/Users/U728217/Desktop/2024Statistik")
+```
+
+# Library
+```{r}
+# Library
+library(rvest)
+library(dplyr)
+library(xml2)
+library(stringr)
+library(tidyr)
+```
+
+# Page where the data is extracted
+
+```{r}
+page_urls<- paste0("https://www.lamudi.co.id/jual/maluku/house/buy/?page=", 1)
+```
+
+# Main Function to extract data from page url above
+
+```{r}
+extract_data <- function(page_urls) {
+  page <- read_html(page_urls)
+  
+  # Extract text from page
+  judul <- page %>% html_nodes("h3.ListingCell-KeyInfo-title") %>% html_text()
+  alamat <- page %>% html_nodes(".ListingCell-KeyInfo-address") %>% html_text()
+  harga <- page %>% html_nodes(".PriceSection-FirstPrice, .PriceSection-NoPrice") %>% html_text()
+  info <- page %>% html_nodes(".KeyInformation_v2") %>% html_text()
+  
+  # Check lengths
+  max_length <- max(length(judul), length(alamat), length(harga), length(info))
+  
+  # Extend vectors with NAs if needed
+  judul <- c(judul, rep(NA, max_length - length(judul)))
+  alamat <- c(alamat, rep(NA, max_length - length(alamat)))
+  harga <- c(harga, rep(NA, max_length - length(harga)))
+  info <- c(info, rep(NA, max_length - length(info)))
+  
+  # Create data frame
+  data <- data.frame(judul, alamat, info, harga, stringsAsFactors = FALSE)
+  
+  # Get data links
+  data_links <- page %>% html_nodes("h3.ListingCell-KeyInfo-title") %>% html_attr("href")
+  full_links <- paste0("https://www.lamudi.co.id", data_links) # Complete the URLs
+  
+  # Function to get location from link
+  get_coords_from_page <- function(page_urls) {
+    page <- read_html(page_urls)
+    
+    # Extract all divs with the target class
+    divs <- page %>% html_nodes('div.ListingCell-AllInfo.ListingUnit')
+    
+    # Initialize vectors to store lat and long
+    latitudes <- vector()
+    longitudes <- vector()
+    
+    # Loop through each div to extract data-geo-point
+    for (div in divs) {
+      geo_point_attr <- xml_attr(div, 'data-geo-point')
+      
+      if (!is.na(geo_point_attr)) {
+        coords <- str_remove_all(geo_point_attr, "\\[|\\]") %>%
+          str_split(",") %>%
+          unlist()
+        
+        if (length(coords) >= 2) {
+          latitudes <- c(latitudes, coords[2])  # Latitude
+          longitudes <- c(longitudes, coords[1])  # Longitude
+        }
+      }
+    }
+    
+    # Combine lat and long into a data frame
+    data.frame(lat = latitudes, lng = longitudes, stringsAsFactors = FALSE)
+  }
+  
+  # URLs for the pages to scrape
+  page_urls <- paste0("https://www.lamudi.co.id/jual/maluku/house/buy/?page=", 1)
+  
+  # Scrape data from all pages
+  data_list <- lapply(page_urls, get_coords_from_page)
+  
+  # Combine data from all pages
+  all_coords <- bind_rows(data_list)
+  
+  # Combine data with coordinates
+  data <- cbind(data, all_coords)
+  
+  # Clean dataset
+  data$judul <- trimws(data$judul)
+  data$alamat <- trimws(data$alamat)
+  data$alamat <- gsub("[ ]{2}", "", data$alamat)
+  data$alamat <- gsub("[\n\n]", " ", data$alamat)
+  data$harga <- gsub("[^0-9]", "", data$harga)
+  data$info <- trimws(data$info)
+  data$info <- gsub("[ ]{2}", "", data$info)
+  data$info <- gsub("[\n\n]", " ", data$info)
+  data$info <- gsub("\\bKamar tidur\\b", "Kamar", data$info)
+  data$info <- gsub("\\bBangunan\\b", "Luas Bangunan", data$info)
+  data$info <- gsub("\\bLahan\\b", "Luas Lahan", data$info)
+  
+  return(data)
+}
+```
+
+# Scrape data from all pages
+
+```{r}
+
+data_list <- lapply(page_urls, extract_data)
+
+# Combine data from all pages
+Maluku_data <- bind_rows(data_list)
+
+# Overview of final data
+
+View(Maluku_data)
+```
+
+# Data Cleaning
+
+```{r}
+data <- Maluku_data
+
+#Split variabel INFO menjadi 3 variabel baru
+data_baru <- separate(data, col=info, into = c("kamar", "bangunan", "tanah"), sep = "       ")
+str(data_baru)
+
+#Mengubah 3 variabel kedalam bentuk numerik
+data_baru$kamar <- as.numeric(gsub("[^0-9]", "", data_baru$kamar))
+data_baru$bangunan <- as.numeric(gsub("[^0-9]", "", data_baru$bangunan))
+data_baru$tanah <- as.numeric(gsub("[^0-9]", "", data_baru$tanah))
+data_baru$harga <- as.numeric(gsub("[^0-9]", "", data_baru$harga))
+data_baru$lat <- as.numeric(data_baru$lat)
+data_baru$lng <- as.numeric(data_baru$lng)
+
+data_baru
+
+str(data_baru)
+
+Maluku = data_baru
+
+write.csv(Maluku, "Maluku.csv", row.names = F)
+```
