@@ -1,0 +1,888 @@
+---
+title: "Visualisasi Data Statistik menggunakan plotly dan ggplot2"
+author: "Sariffuddin"
+date: "r Sys.Date()"
+output: rmdformats::readthedown
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Pendahuluan
+
+Visualisasi data adalah proses menyajikan data secara grafis untuk mengungkap pola, tren, dan wawasan yang mempermudah pemahaman informasi kompleks.
+
+Fungsi: menyederhanakan dan memperjelas interpretasi data, mengidentifikasi pola atau tren.
+
+## Plotly
+
+1. Interaktif dan Dinamis. Plotly memungkinkan pembuatan grafik interaktif langsung dari R, seperti zoom, hover tooltips, dan pan, tanpa memerlukan konfigurasi tambahan.
+
+2. Beragam Jenis Visualisasi. Mendukung berbagai jenis grafik, termasuk scatter plot, bar chart, line chart, radar chart, treemap, 3D plot, dan masih banyak lagi, dengan opsi kustomisasi yang kaya.
+
+3. Integrasi Mulus. Mudah diintegrasikan dengan pustaka visualisasi lain seperti ggplot2 menggunakan ggplotly(), memungkinkan transisi dari grafik statis ke grafik interaktif dengan mudah.
+
+## ggplot2
+
+1. Pendekatan Berbasis Grammar of Graphics. ggplot2 menggunakan prinsip "Grammar of Graphics" untuk membangun visualisasi, memungkinkan pembuatan grafik yang kompleks dengan komponen terpisah seperti data, estetika, dan geometri.
+
+2. Fleksibilitas Tinggi. Mendukung berbagai jenis grafik (scatter, line, bar, histogram, dll.) dengan kemampuan kustomisasi tinggi untuk mengontrol skala, tema, warna, dan elemen grafis lainnya.
+
+3. Ekosistem yang Kuat. Memiliki dukungan dari banyak paket tambahan (seperti ggthemes, ggridges, ggpubr) untuk memperluas fungsionalitas, serta integrasi mudah dengan manipulasi data melalui dplyr atau tidyr.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, message=FALSE, warning=FALSE}
+library(plotly)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(mapview)
+library(leaflet)
+library(tidyr)
+library(treemapify)
+library(ggradar)
+library(sf)
+```
+
+# Working Directory
+```{r}
+setwd("C:/Users/U728217/Desktop/2024Statistik") #sesuaikan dengan komputer masing-masing
+```
+
+```{r A. Data Distribution for All data}
+df <- read_excel("Semarang_fix.xlsx")
+```
+
+# Histogram
+
+Histogram : grafik yang menunjukkan distribusi frekuensi data dalam interval tertentu, dengan batang-batang yang tingginya mencerminkan jumlah data dalam setiap interval.
+
+Fungsi : memvisualisasikan distribusi data secara grafis, membantu mengidentifikasi pola, seperti simetri, kemiringan, atau penyimpangan dalam data.
+
+```{r A. Histogram Plotly}
+
+# Membuat histogram untuk variabel harga
+hist <- plot_ly(
+  data = df,
+  x = ~harga,
+  type = "histogram",
+  nbinsx = 20
+)
+
+# Tambahkan layout untuk meningkatkan tampilan
+hist <- hist %>%
+  layout(
+    title = "Histogram of House Prices",
+    xaxis = list(title = "Price (IDR)"),
+    yaxis = list(title = "Frequency"),
+    template = "plotly_white"
+  )
+
+# Tampilkan plot
+hist
+```
+
+```{r A. Histogram ggplot2}
+
+# Membuat histogram untuk variabel harga
+ggplot(df, aes(x = harga)) +
+  geom_histogram(binwidth = 500000000, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Histogram of House Prices",
+    x = "Price (IDR)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+# Pie Chart
+
+Pie chart adalah diagram berbentuk lingkaran yang digunakan untuk menunjukkan proporsi atau persentase dari suatu keseluruhan, dengan setiap irisan mewakili kategori data tertentu.
+
+Fungsi pie chart adalah untuk memvisualisasikan perbandingan proporsi antar kategori dalam suatu dataset secara intuitif dalam bentuk segmen lingkaran.
+
+```{r B. Pie Chart Plotly}
+
+# Buat data agregat untuk pie chart (contoh: frekuensi berdasarkan alamat)
+pie_data <- as.data.frame(table(df$alamat))
+colnames(pie_data) <- c("alamat", "count")
+
+# Membuat pie chart
+fig <- plot_ly(
+  pie_data,
+  labels = ~alamat,
+  values = ~count,
+  type = 'pie',
+  textinfo = 'label+percent',
+  insidetextorientation = 'radial'
+)
+
+# Tambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Pie Chart of Housing Locations",
+    showlegend = TRUE
+  )
+
+# Tampilkan plot
+fig
+```
+
+```{r B. Pie Chart ggplot2}
+
+# Agregasi data untuk pie chart (frekuensi berdasarkan alamat)
+pie_data <- df %>%
+  count(alamat, name = "count") %>%
+  mutate(percentage = count / sum(count) * 100, 
+         label = paste0(alamat, " (", round(percentage, 1), "%)"))
+
+# Membuat pie chart
+ggplot(pie_data, aes(x = "", y = count, fill = alamat)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  labs(
+    title = "Pie Chart of Housing Locations",
+    x = NULL,
+    y = NULL,
+    fill = "Location"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9)
+  )
+```
+
+# Bar Chart
+
+Bar chart adalah grafik yang menggunakan batang horizontal atau vertikal untuk membandingkan jumlah atau frekuensi antar kategori dalam suatu dataset.
+
+Fungsi bar chart : memvisualisasikan perbandingan jumlah atau frekuensi antar kategori secara jelas dan mudah dipahami.
+
+```{r C. Bar Chart Plotly}
+
+# Agregasi data untuk bar chart (contoh: jumlah rumah berdasarkan luas lahan)
+bar_data <- df %>%
+  count(lahan, name = "count")
+
+# Membuat bar chart
+fig <- plot_ly(
+  bar_data,
+  x = ~lahan,
+  y = ~count,
+  type = 'bar',
+  marker = list(color = 'blue')
+)
+
+# Tambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Bar Chart of Land Sizes",
+    xaxis = list(title = "Land Size (m²)"),
+    yaxis = list(title = "Number of Houses"),
+    template = "plotly_white"
+  )
+
+# Tampilkan plot
+fig
+```
+
+```{r C. Bar Chart ggplot2}
+
+# Agregasi data untuk bar chart (contoh: jumlah rumah berdasarkan luas lahan)
+bar_data <- df %>%
+  count(lahan, name = "count")
+
+# Membuat bar chart
+ggplot(bar_data, aes(x = lahan, y = count)) +
+  geom_bar(stat = "identity", fill = "blue", color = "black", alpha = 0.8) +
+  labs(
+    title = "Bar Chart of Land Sizes",
+    x = "Land Size (m²)",
+    y = "Number of Houses"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+```{r C. Bar Chart of Average Price by Address ggplot2}
+
+# Create summary data
+avg_price_by_address <- df %>%
+  group_by(alamat) %>%
+  summarize(avg_price = mean(harga, na.rm = TRUE)) %>%
+  arrange(desc(avg_price))
+
+# Bar chart
+ggplot(avg_price_by_address, aes(x = reorder(alamat, -avg_price), y = avg_price)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(
+    title = "Average House Price by Address",
+    x = "Address",
+    y = "Average Price (IDR)"
+  ) +
+  theme_minimal()
+
+```
+
+# Line Chart
+
+Line chart adalah grafik yang menggunakan garis untuk menghubungkan data titik-titik, menunjukkan tren atau perubahan suatu variabel secara berkesinambungan terhadap waktu atau variabel lainnya.
+
+Fungsi line chart adalah untuk memvisualisasikan tren, pola, atau perubahan suatu variabel secara berkesinambungan, biasanya dalam kaitannya dengan waktu atau urutan.
+
+```{r D. Line Chart Plotly}
+
+# Mengurutkan data berdasarkan luas rumah
+line_data <- df %>%
+  arrange(rumah)
+
+# Membuat line chart
+fig <- plot_ly(
+  line_data,
+  x = ~rumah,
+  y = ~harga, # Contoh: harga rumah sebagai nilai pada sumbu y
+  type = 'scatter',
+  mode = 'lines+markers',
+  line = list(color = 'blue')
+)
+
+# Tambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Line Chart of House Sizes vs Prices",
+    xaxis = list(title = "House Size (m²)"),
+    yaxis = list(title = "Price (IDR)"),
+    template = "plotly_white"
+  )
+
+# Tampilkan plot
+fig
+```
+
+```{r D. Line Chart ggplot2}
+
+# Mengurutkan data berdasarkan luas rumah
+line_data <- df %>%
+  arrange(rumah)
+
+# Membuat line chart
+ggplot(line_data, aes(x = rumah, y = harga)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "red", size = 2) +
+  labs(
+    title = "Line Chart of House Sizes vs Prices",
+    x = "House Size (m²)",
+    y = "Price (IDR)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+# Box Plot
+
+Boxplot adalah grafik yang menunjukkan distribusi data berdasarkan lima ukuran ringkasan (minimum, kuartil pertama, median, kuartil ketiga, maksimum) dan mengidentifikasi potensi outlier.
+
+Fungsi boxplot adalah untuk memvisualisasikan distribusi data, mendeteksi penyebaran, simetri, dan outlier, serta membandingkan distribusi antar kelompok.
+
+```{r E. Boxplot Plotly}
+
+# Membuat boxplot untuk variabel harga dengan outliers
+fig <- plot_ly(
+  data = df,
+  y = ~harga,
+  type = "box",
+  boxpoints = "all", # Menampilkan semua titik data (jika ingin)
+  jitter = 0.3,      # Mengatur jarak titik untuk visualisasi lebih baik
+  pointpos = -1.8    # Mengatur posisi titik di sekitar boxplot
+)
+
+# Menambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Boxplot of House Prices",
+    yaxis = list(title = "Price (IDR)"),
+    template = "plotly_white"
+  )
+
+# Tampilkan plot
+fig
+```
+
+```{r E. Boxplot ggplot2}
+
+# Membuat boxplot untuk variabel harga
+ggplot(df, aes(y = harga)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(
+    title = "Boxplot of House Prices",
+    y = "Price (IDR)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+# Scatter Plot
+
+Scatter plot adalah jenis visualisasi data statistik yang menampilkan hubungan atau pola antara dua variabel numerik dengan merepresentasikan data sebagai titik-titik pada bidang kartesian.
+
+Fungsi utama scatter plot adalah untuk memvisualisasikan hubungan, pola, atau korelasi antara dua variabel numerik dan mengidentifikasi tren atau outlier dalam data.
+
+```{r F. Boxplot Plotly}
+
+# Membuat scatter plot untuk variabel harga dan lahan
+fig <- plot_ly(
+  data = df,
+  x = ~lahan,
+  y = ~harga,
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(size = 10, color = 'blue', opacity = 0.6)
+)
+
+# Menambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Scatter Plot of Land Size vs House Prices",
+    xaxis = list(title = "Land Size (m²)"),
+    yaxis = list(title = "Price (IDR)"),
+    template = "plotly_white"
+  )
+
+# Tampilkan plot
+fig
+```
+
+```{r F. Scatter plot}
+
+# Membuat scatter plot untuk variabel harga dan lahan
+ggplot(df, aes(x = lahan, y = harga)) +
+  geom_point(color = "blue", size = 3, alpha = 0.6) +
+  labs(
+    title = "Scatter Plot of Land Size vs House Prices",
+    x = "Land Size (m²)",
+    y = "Price (IDR)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+# Bubble Chart
+
+Bubble chart adalah visualisasi data yang menampilkan hubungan antara tiga variabel numerik, di mana dua variabel direpresentasikan oleh posisi titik pada sumbu x dan y, dan variabel ketiga oleh ukuran atau warna titik.
+
+Fungsi bubble chart adalah untuk memvisualisasikan hubungan dan distribusi antara tiga variabel numerik secara simultan, membantu mengidentifikasi pola, tren, atau outlier dalam data.
+
+```{r G. Bubble Chart Plotly}
+
+# Create bubble chart
+fig <- plot_ly(
+  data = df,
+  x = ~rumah,          # House size on the x-axis
+  y = ~lahan,          # Land size on the y-axis
+  size = ~harga,       # Price determines bubble size
+  color = ~harga,      # Color represents price
+  type = 'scatter',
+  mode = 'markers',
+  marker = list(sizemode = 'diameter', opacity = 0.7)
+)
+
+# Add layout to the chart
+fig <- fig %>%
+  layout(
+    title = "Bubble Chart of House Data",
+    xaxis = list(title = "House Size (m²)"),
+    yaxis = list(title = "Land Size (m²)"),
+    showlegend = TRUE
+  )
+
+# Display the chart
+fig
+```
+
+```{r G. Scatter plot ggplot2}
+
+ggplot(df, aes(x = rumah, y = lahan, size = harga, color = harga)) +
+  geom_point(alpha = 0.7) +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(
+    title = "Bubble Chart of House Data",
+    x = "House Size (m²)",
+    y = "Land Size (m²)",
+    size = "Price (IDR)",
+    color = "Price (IDR)"
+  ) +
+  theme_minimal()
+
+```
+
+# Density Plot
+
+Density plot adalah visualisasi data yang menggambarkan distribusi probabilitas dari suatu variabel kontinu, memberikan representasi halus dari frekuensi data melalui kurva berbasis kernel smoothing.
+
+Fungsi density plot adalah untuk memvisualisasikan distribusi data kontinu, membantu mengidentifikasi pola, kepadatan, dan penyebaran nilai dalam dataset secara halus dan intuitif.
+
+```{r H. Density plot Plotly}
+
+# Pastikan data harga tidak memiliki nilai NA
+df_clean <- df %>% filter(!is.na(harga))
+
+# Membuat density plot
+fig <- plot_ly(
+  data = df_clean,
+  x = ~harga,
+  type = "histogram",
+  histnorm = "density",       # Mengatur agar histogram menunjukkan density
+  nbinsx = 30,               # Mengatur jumlah bins
+  marker = list(color = 'blue', line = list(color = 'black', width = 1))
+)
+
+# Menambahkan layout
+fig <- fig %>%
+  layout(
+    title = "Density Plot of House Prices",
+    xaxis = list(title = "Price (IDR)"),
+    yaxis = list(title = "Density"),
+    template = "plotly_white"
+  )
+
+# Menampilkan plot
+fig
+```
+
+```{r H. Density plot ggplot2}
+
+ggplot(df, aes(x = harga)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  labs(
+    title = "Density Plot of House Prices",
+    x = "Price (IDR)",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+# Violin Plot
+
+Violin plot adalah visualisasi data yang menggabungkan elemen box plot dan density plot untuk menunjukkan distribusi data numerik, termasuk median, kuartil, outlier, dan kepadatan data secara simetris.
+
+Fungsi violin plot adalah untuk memvisualisasikan distribusi dan variasi data numerik, membantu membandingkan kepadatan, median, kuartil, dan outlier antar kelompok atau kategori secara efektif.
+
+```{r I. Violin plot Plotly}
+
+# Pastikan data harga tidak memiliki nilai NA
+df_clean <- df %>% filter(!is.na(harga))
+
+# Membuat violin plot
+fig <- plot_ly(
+  data = df_clean,
+  y = ~harga,
+  type = 'violin',
+  box = list(visible = TRUE),       # Menampilkan box plot dalam violin plot
+  meanline = list(visible = TRUE), # Menampilkan garis rata-rata
+  points = "all",                  # Menampilkan semua data poin
+  jitter = 0.3,                    # Menambahkan jitter untuk data poin
+  scalemode = "width"              # Skala lebar berdasarkan kepadatan
+)
+
+# Menambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Violin Plot of House Prices",
+    yaxis = list(title = "Price (IDR)"),
+    template = "plotly_white"
+  )
+
+# Menampilkan plot
+fig
+```
+
+```{r I. Violin plot ggplot2}
+
+# Pastikan data harga tidak memiliki nilai NA
+#df_clean <- df %>% filter(!is.na(harga))
+
+# Membuat violin plot
+#ggplot(df_clean, aes(y = harga)) +
+#  geom_violin(fill = "blue", alpha = 0.5, color = "black") + # Membuat violin plot
+#  geom_boxplot(width = 0.1, color = "black", alpha = 0.7, outlier.color = "red") + # Tambahkan boxplot di dalam violin plot
+#  labs(
+#    title = "Violin Plot of House Prices",
+#    y = "Price (IDR)",
+#    x = NULL
+#  ) +
+#  theme_minimal() +
+#  theme(
+#    plot.title = element_text(hjust = 0.5)
+#  )
+```
+
+# Area Chart
+
+Area chart adalah visualisasi data yang menggunakan grafik garis dengan area di bawahnya diisi warna untuk menunjukkan kuantitas atau perubahan nilai suatu variabel kontinu seiring waktu atau kategori.
+
+Fungsi area chart adalah untuk memvisualisasikan tren atau perubahan kumulatif suatu variabel kontinu, menyoroti hubungan antara nilai dan waktu atau kategori secara intuitif.
+
+```{r J. Area Chart Plotly}
+
+# Pastikan data tidak memiliki nilai NA
+df_clean <- df %>% filter(!is.na(harga) & !is.na(rumah))
+
+# Urutkan data berdasarkan ukuran rumah untuk area chart
+df_clean <- df_clean %>% arrange(rumah)
+
+# Membuat area chart
+fig <- plot_ly(
+  data = df_clean,
+  x = ~rumah,          # Ukuran rumah pada sumbu x
+  y = ~harga,          # Harga pada sumbu y
+  type = "scatter",    # Tipe scatter
+  mode = "lines",      # Menampilkan sebagai garis
+  fill = "tozeroy",    # Area diisi hingga sumbu y=0
+  line = list(color = "blue") # Warna garis
+)
+
+# Menambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Area Chart of House Prices by House Size",
+    xaxis = list(title = "House Size (m²)"),
+    yaxis = list(title = "Price (IDR)"),
+    template = "plotly_white"
+  )
+
+# Menampilkan chart
+fig
+```
+
+```{r J. Area Chart ggplot2}
+
+# Pastikan data tidak memiliki nilai NA
+df_clean <- df %>% filter(!is.na(harga) & !is.na(rumah))
+
+# Urutkan data berdasarkan ukuran rumah untuk area chart
+df_clean <- df_clean %>% arrange(rumah)
+
+# Membuat area chart
+ggplot(df_clean, aes(x = rumah, y = harga)) +
+  geom_area(fill = "blue", alpha = 0.5) +
+  geom_line(color = "blue", size = 1) +
+  labs(
+    title = "Area Chart of House Prices by House Size",
+    x = "House Size (m²)",
+    y = "Price (IDR)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+# Tree Map
+
+Tree map adalah visualisasi data hierarkis yang menggunakan persegi panjang bersarang, dengan ukuran dan warna setiap kotak merepresentasikan nilai numerik untuk menunjukkan proporsi dan hubungan antar kategori.
+
+Fungsi tree map adalah untuk memvisualisasikan distribusi, proporsi, dan hubungan hierarkis antar kategori secara intuitif dengan memanfaatkan ukuran dan warna kotak.
+
+```{r K. Tree Map Plotly}
+
+# Pastikan data tidak memiliki nilai NA pada kolom yang akan digunakan
+df_clean <- df %>% filter(!is.na(harga) & !is.na(alamat))
+
+# Agregasi data berdasarkan alamat
+tree_data <- df_clean %>%
+  group_by(alamat) %>%
+  summarize(total_price = sum(harga, na.rm = TRUE)) %>%
+  arrange(desc(total_price))
+
+# Membuat tree map
+fig <- plot_ly(
+  data = tree_data,
+  type = "treemap",
+  labels = ~alamat,            # Label untuk kotak
+  parents = "",                # Root node kosong (top level)
+  values = ~total_price,       # Ukuran kotak berdasarkan total harga
+  textinfo = "label+value",    # Menampilkan label dan nilai
+  marker = list(colorscale = "Viridis") # Palet warna
+)
+
+# Menambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Tree Map of Total House Prices by Address",
+    template = "plotly_white"
+  )
+
+# Menampilkan plot
+fig
+```
+
+```{r K. Tree Map ggplot2}
+
+# Pastikan data tidak memiliki nilai NA pada kolom yang akan digunakan
+df_clean <- df %>% filter(!is.na(harga) & !is.na(alamat))
+
+# Agregasi data berdasarkan alamat
+tree_data <- df_clean %>%
+  group_by(alamat) %>%
+  summarize(total_price = sum(harga, na.rm = TRUE)) %>%
+  arrange(desc(total_price))
+
+# Membuat tree map
+ggplot(tree_data, aes(
+  area = total_price, 
+  fill = total_price, 
+  label = alamat
+)) +
+  geom_treemap() +
+  geom_treemap_text(
+    fontface = "italic", 
+    colour = "white", 
+    place = "centre", 
+    grow = TRUE
+  ) +
+  labs(
+    title = "Tree Map of Total House Prices by Address",
+    fill = "Total Price (IDR)"
+  ) +
+  theme_minimal()
+```
+
+# Radar Chart
+
+Radar chart adalah visualisasi data berbentuk poligon yang digunakan untuk membandingkan nilai dari beberapa variabel kuantitatif dalam beberapa kategori pada skala radial.
+
+Fungsi radar chart adalah untuk membandingkan dan memvisualisasikan pola atau distribusi beberapa variabel kuantitatif di berbagai kategori secara intuitif dalam bentuk radial.
+
+```{r L. Radar Chart Plotly}
+
+# Pilih beberapa rumah sebagai sampel untuk radar chart
+radar_data <- df %>%
+  filter(!is.na(harga) & !is.na(rumah) & !is.na(lahan)) %>%
+  slice(1:3) %>% # Ambil 3 rumah pertama sebagai contoh
+  select(harga, rumah, lahan) %>%
+  mutate(id = paste0("House ", row_number())) # Tambahkan ID untuk setiap rumah
+
+# Ubah data ke format long untuk radar chart
+radar_long <- radar_data %>%
+  pivot_longer(-id, names_to = "variable", values_to = "value")
+
+# Normalisasi data agar nilai antar variabel sebanding
+radar_long <- radar_long %>%
+  group_by(variable) %>%
+  mutate(value = value / max(value, na.rm = TRUE))
+
+# Membuat radar chart
+fig <- plot_ly(
+  type = 'scatterpolar',
+  mode = 'lines+markers'
+)
+
+# Tambahkan data untuk setiap rumah
+for (house_id in unique(radar_long$id)) {
+  house_data <- radar_long %>% filter(id == house_id)
+  fig <- fig %>%
+    add_trace(
+      r = house_data$value,
+      theta = house_data$variable,
+      fill = 'toself',
+      name = house_id
+    )
+}
+
+# Tambahkan layout
+fig <- fig %>%
+  layout(
+    polar = list(
+      radialaxis = list(visible = TRUE, range = c(0, 1))
+    ),
+    title = "Radar Chart of Houses",
+    showlegend = TRUE
+  )
+
+# Tampilkan radar chart
+fig
+```
+
+```{r L. Radar Chart ggplot2}
+
+# Pilih beberapa rumah sebagai sampel untuk radar chart
+radar_data <- df %>%
+  filter(!is.na(harga) & !is.na(rumah) & !is.na(lahan)) %>%
+  slice(1:3) %>% # Ambil 3 rumah pertama sebagai contoh
+  select(harga, rumah, lahan) %>%
+  mutate(id = paste0("House ", row_number())) # Tambahkan ID untuk setiap rumah
+
+# Normalisasi data agar nilai antar variabel sebanding
+radar_normalized <- radar_data %>%
+  mutate(across(c(harga, rumah, lahan), ~ .x / max(.x, na.rm = TRUE))) %>%
+  rename(
+    Price = harga,
+    House_Size = rumah,
+    Land_Size = lahan
+  )
+
+# Ggradar mengharuskan kolom grup berada di kolom pertama
+radar_normalized <- radar_normalized %>%
+  relocate(id)
+
+# Membuat radar chart
+ggradar(
+  plot.data = radar_normalized,
+  grid.min = 0,      # Minimum nilai grid
+  grid.mid = 0.5,    # Nilai tengah grid
+  grid.max = 1,      # Nilai maksimum grid
+  axis.label.size = 3,
+  group.point.size = 3,
+  group.line.width = 1,
+  legend.text.size = 8
+) +
+  labs(title = "Radar Chart of Houses")
+```
+
+# Pareto Chart
+
+Pareto chart adalah visualisasi data yang menggabungkan bar chart untuk menunjukkan frekuensi atau nilai kategori dengan garis kumulatif untuk mengidentifikasi kontribusi relatif dari setiap kategori terhadap total.
+
+Fungsi Pareto chart adalah untuk mengidentifikasi kategori yang paling signifikan dalam data dengan menyoroti kontribusi kumulatif setiap kategori terhadap total, sehingga membantu fokus pada faktor yang memiliki dampak terbesar.
+
+```{r M. Pareto Chart Plotly}
+
+# Hitung frekuensi berdasarkan alamat dan urutkan dari yang tertinggi
+pareto_data <- df %>%
+  filter(!is.na(alamat)) %>%
+  count(alamat, name = "frequency") %>%
+  arrange(desc(frequency)) %>%
+  mutate(cumulative = cumsum(frequency) / sum(frequency) * 100) # Hitung kontribusi kumulatif
+
+# Membuat Pareto chart menggunakan plotly
+fig <- plot_ly() %>%
+  add_bars(
+    x = ~pareto_data$alamat,
+    y = ~pareto_data$frequency,
+    name = "Frequency",
+    marker = list(color = "blue")
+  ) %>%
+  add_lines(
+    x = ~pareto_data$alamat,
+    y = ~pareto_data$cumulative,
+    name = "Cumulative %",
+    yaxis = "y2",
+    line = list(color = "red", width = 2)
+  ) %>%
+  layout(
+    title = "Pareto Chart of Address Frequency",
+    xaxis = list(title = "Address"),
+    yaxis = list(title = "Frequency"),
+    yaxis2 = list(
+      title = "Cumulative Percentage",
+      overlaying = "y",
+      side = "right",
+      showgrid = FALSE
+    ),
+    legend = list(x = 1.1, y = 1)
+  )
+
+# Menampilkan Pareto chart
+fig
+```
+
+```{r M. Pareto Chart ggplot2}
+
+# Hitung frekuensi berdasarkan alamat dan urutkan dari yang tertinggi
+pareto_data <- df %>%
+  filter(!is.na(alamat)) %>%
+  count(alamat, name = "frequency") %>%
+  arrange(desc(frequency)) %>%
+  mutate(
+    cumulative = cumsum(frequency) / sum(frequency) * 100, # Hitung kontribusi kumulatif
+    alamat = factor(alamat, levels = unique(alamat))       # Menjaga urutan alamat
+  )
+
+# Membuat Pareto chart
+ggplot(pareto_data, aes(x = alamat, y = frequency)) +
+  geom_bar(stat = "identity", fill = "blue", alpha = 0.7) + # Bar chart untuk frekuensi
+  geom_line(aes(y = cumulative * max(frequency) / 100, group = 1), color = "red", size = 1) + # Garis kumulatif
+  geom_point(aes(y = cumulative * max(frequency) / 100), color = "red", size = 2) + # Titik kumulatif
+  scale_y_continuous(
+    name = "Frequency",
+    sec.axis = sec_axis(~ . / max(pareto_data$frequency) * 100, name = "Cumulative Percentage")
+  ) +
+  labs(
+    title = "Pareto Chart of Address Frequency",
+    x = "Address",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+# Contour Plot
+
+Contour plot adalah visualisasi data yang menggambarkan hubungan antara dua variabel numerik pada sumbu x dan y, dengan garis atau area berwarna yang mewakili level atau nilai variabel ketiga.
+
+Fungsi contour plot adalah untuk memvisualisasikan distribusi atau pola variasi suatu variabel numerik dalam ruang dua dimensi, membantu mengidentifikasi level atau tren dalam data secara intuitif.
+
+```{r N. Contour Plot Plotly}
+
+# Pastikan data tidak memiliki nilai NA pada kolom yang digunakan
+df_clean <- df %>% filter(!is.na(harga) & !is.na(rumah) & !is.na(lahan))
+
+# Membuat contour plot
+fig <- plot_ly(
+  data = df_clean,
+  x = ~rumah,       # Variabel x (house size)
+  y = ~lahan,       # Variabel y (land size)
+  z = ~harga,       # Variabel z (price)
+  type = "contour", # Tipe plot adalah contour
+  colorscale = "Viridis"
+)
+
+# Menambahkan layout untuk meningkatkan tampilan
+fig <- fig %>%
+  layout(
+    title = "Contour Plot of House Prices",
+    xaxis = list(title = "House Size (m²)"),
+    yaxis = list(title = "Land Size (m²)"),
+    template = "plotly_white"
+  )
+
+# Menampilkan plot
+fig
+```
+
+```{r N. Contour Plott ggplot2}
+
+# Pastikan data tidak memiliki nilai NA pada kolom yang digunakan
+#df_clean <- df %>% filter(!is.na(harga) & !is.na(rumah) & !is.na(lahan))
+
+# Membuat contour plot
+#ggplot(df_clean, aes(x = rumah, y = lahan, z = harga)) +
+#  geom_contour_filled() +
+#  labs(
+#    title = "Contour Plot of House Prices",
+#    x = "House Size (m²)",
+#    y = "Land Size (m²)",
+#    fill = "Price (IDR)"
+#  ) +
+#  theme_minimal()
+```
